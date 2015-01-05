@@ -21,7 +21,7 @@ namespace RantType
 	{
 		// Don't like this feature, leaving it off.
 		private bool _allowClose = true;
-		private readonly bool _autoHide = false;
+		private readonly bool _autoHide = true;
 		private readonly RantEngine _rantEngine = new RantEngine("dictionaries");
 		public List<Key> KeyBuffer { get; } = new List<Key>();
 		readonly SolidColorBrush _redBrush = new SolidColorBrush(Colors.DarkRed);
