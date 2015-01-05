@@ -74,6 +74,7 @@
     <Compile Include="CustomCommands.cs" />
     <Compile Include="EntryPoint.cs" />
     <Compile Include="Hook\KeyboardHook.cs" />
+    <Compile Include="Hook\KeyEventArgs.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>

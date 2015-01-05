@@ -1,7 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Forms;
+using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Rant;
 using Application = System.Windows.Application;
@@ -18,8 +21,11 @@ namespace RantType
 	{
 		// Don't like this feature, leaving it off.
 		private bool _allowClose = true;
-		private readonly bool _autoHide = true;
+		private readonly bool _autoHide = false;
 		private readonly RantEngine _rantEngine = new RantEngine("dictionaries");
+		public List<Key> KeyBuffer { get; } = new List<Key>();
+		readonly SolidColorBrush _redBrush = new SolidColorBrush(Colors.DarkRed);
+		readonly SolidColorBrush _greyBrush = new SolidColorBrush(Colors.DimGray);
 
 
 		public MainWindow()
@@ -33,27 +39,62 @@ namespace RantType
 				Visibility = Visibility.Hidden;
 
 			InitializeComponent();
-
 			var app = Application.Current as App;
-			if (app != null) app.Hook.KeyCombinationPressed += Hook_KeyCombinationPressed;
+			if (app == null) return;
+			app.Hook.KeyCombinationPressed += Hook_KeyCombinationPressed;
+			app.Hook.KeyPressed += Hook_KeyPressed;
+		}
+
+		private void Hook_KeyPressed(object sender, Hook.KeyEventArgs e)
+		{
+			if (KeyBuffer.Count == 5)
+				KeyBuffer.RemoveAt(0);
+
+			KeyBuffer.Add(e.Key);
+			ListboxAdd(string.Join(", ", KeyBuffer), _greyBrush);
+
+			if (KeyBuffer.Count == 5 &&
+				KeyBuffer[0] == Key.OemQuestion &&
+			    KeyBuffer[1] == Key.R &&
+			    KeyBuffer[2] == Key.A &&
+			    KeyBuffer[3] == Key.N &&
+			    KeyBuffer[4] == Key.T)
+			{
+				DoRant(true);
+			}
+		}
+
+		private void ListboxAdd(string newItem, SolidColorBrush color)
+		{
+			ListBox.Items.Add(new { Text = newItem, Color = color } );
+			ListBox.UpdateLayout();
+			ListBox.ScrollIntoView(ListBox.Items[ListBox.Items.Count - 1]);
 		}
 
 		private void Hook_KeyCombinationPressed(object sender, EventArgs e)
 		{
-			// Get clipboard
+			DoRant();
+		}
+		 
+		private void DoRant(bool backspace = false)
+		{
+// Get clipboard
 			if (!Clipboard.ContainsText(TextDataFormat.Text)) return;
 			var s = Clipboard.GetText(TextDataFormat.Text);
 
 			try
 			{
 				var r = _rantEngine.Do(s);
-				ListBox.Items.Add(r.ToString());
+				ListboxAdd(r.ToString(), _redBrush);
 
 				var t = new DispatcherTimer();
 				t.Tick += (send, ea) =>
 				{
-					SendKeys.SendWait(r.ToString());
 					t.Stop();
+					var rant = r.ToString();
+					if (backspace)
+						rant = "\b\b\b\b\b" + rant;
+					PrintRant(rant);
 				};
 				t.Interval = new TimeSpan(0, 0, 0, 0, 500);
 				t.Start();
@@ -61,10 +102,37 @@ namespace RantType
 			catch (Exception ex)
 			{
 				// silent error
-				ListBox.Items.Add(ex.Message);
+				ListboxAdd(ex.Message, _redBrush);
 			}
 		}
 
+		private void PrintRant(string rant)
+		{
+			if (rant.Contains("\n"))
+			{
+				var lines = rant.Split(new[] {Environment.NewLine}, StringSplitOptions.None);
+
+				// ReSharper disable once ForCanBeConvertedToForeach
+				for (var index = 0; index < lines.Length; index++)
+				{
+					var line = lines[index];
+					try
+					{
+						SendKeys.SendWait(line);
+						SendKeys.SendWait(Environment.NewLine);
+						System.Threading.Thread.Sleep(50);
+					}
+					catch (Exception ex)
+					{
+						ListboxAdd(ex.Message, _redBrush);
+					}
+				}
+			}
+			else
+			{
+				SendKeys.SendWait(rant);
+			}
+		}
 
 		#region Methods
 

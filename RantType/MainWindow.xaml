@@ -7,8 +7,7 @@
 		xmlns:local="clr-namespace:RantType"
 		mc:Ignorable="d"
 		Title="RantType Output" Height="350" Width="525" Icon="Resources/Rant.ico" 
-		Loaded="Window_Loaded" ShowInTaskbar="False" StateChanged="Window_StateChanged" ResizeMode="CanMinimize" Closing="Window_Closing"
-		>
+		Loaded="Window_Loaded" ShowInTaskbar="False" StateChanged="Window_StateChanged" ResizeMode="CanMinimize" Closing="Window_Closing">
 	<Window.Resources>
 		<local:ShowSettingsCommand x:Key="SettingsCommand" Executed="SettingsCommand_OnExecuted"/>
 	</Window.Resources>
@@ -23,6 +22,13 @@
 			</tb:TaskbarIcon.ContextMenu>
 		</tb:TaskbarIcon>
 		
-		<ListBox x:Name="ListBox"/>
+		<ListBox x:Name="ListBox">
+			<ListBox.ItemTemplate>
+				<DataTemplate>
+					<!-- ReSharper disable once Xaml.BindingWithContextNotResolved -->
+					<TextBlock Text="{Binding Text}" Foreground="{Binding Color}"/>
+				</DataTemplate>
+			</ListBox.ItemTemplate>
+		</ListBox>
 	</Grid>
 </Window>

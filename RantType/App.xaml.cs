@@ -9,6 +9,11 @@ namespace RantType
 		private MainWindow _window;
 		public KeyboardHook Hook { get; private set; }
 
+		public App()
+		{
+			throw new ArgumentException("Can not run without KeyboardHook.");
+		}
+
 		public App(KeyboardHook keyboardHook)
 		{
 			if (keyboardHook == null) throw new ArgumentNullException("keyboardHook");
