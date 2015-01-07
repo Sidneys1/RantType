@@ -1,19 +1,21 @@
-﻿using System.Windows.Input;
-using RantType.Hook;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace RantType
 {
 	class EntryPoint
 	{
-		[System.STAThread]
+		[STAThread]
 		static void Main()
 		{
-			using (var hook = new KeyboardHook {SelectedKey = Key.F1})
-			{
-				var app = new App(hook);
-				app.Run();
-			}
-		}
+			var app = new App {MainWindow = new MainWindow()};
 
+			app.MainWindow.Show();
+
+			app.Run();
+		}
 	}
 }

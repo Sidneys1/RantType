@@ -1,14 +1,18 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Windows;
 using System.Windows.Forms;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using KeyStates;
 using Rant;
+using RantType.Annotations;
 using Application = System.Windows.Application;
 using Clipboard = System.Windows.Clipboard;
+using Key = KeyStates.VirtualKeyCode;
+using KeyEventArgs = KeyStates.KeyEventArgs;
 using MessageBox = System.Windows.MessageBox;
 using TextDataFormat = System.Windows.TextDataFormat;
 
@@ -21,12 +25,14 @@ namespace RantType
 	{
 		// Don't like this feature, leaving it off.
 		private bool _allowClose = true;
-		private readonly bool _autoHide = true;
+		private readonly bool _autoHide = false;
 		private readonly RantEngine _rantEngine = new RantEngine("dictionaries");
-		public List<Key> KeyBuffer { get; } = new List<Key>();
 		readonly SolidColorBrush _redBrush = new SolidColorBrush(Colors.DarkRed);
-		readonly SolidColorBrush _greyBrush = new SolidColorBrush(Colors.DimGray);
 
+		private string _keyBuffer = string.Empty;
+		private bool _capturing;
+		private string _captureString;
+		private LsItem _captureObj;
 
 		public MainWindow()
 		{
@@ -41,44 +47,80 @@ namespace RantType
 			InitializeComponent();
 			var app = Application.Current as App;
 			if (app == null) return;
-			app.Hook.KeyCombinationPressed += Hook_KeyCombinationPressed;
-			app.Hook.KeyPressed += Hook_KeyPressed;
+			KeyboardMonitor.KeyPressed += Hook_KeyPressed;
 		}
 
-		private void Hook_KeyPressed(object sender, Hook.KeyEventArgs e)
+		private void Hook_KeyPressed(KeyEventArgs e)
 		{
-			if (KeyBuffer.Count == 5)
-				KeyBuffer.RemoveAt(0);
+			Dispatcher.Invoke(DispatcherPriority.Input, new KeyEvent(ProcessKeypress), e);
+		}
 
-			KeyBuffer.Add(e.Key);
-			ListboxAdd(string.Join(", ", KeyBuffer), _greyBrush);
+		private void ProcessKeypress(KeyEventArgs e)
+		{
+			if (_keyBuffer.Length == 5)
+				_keyBuffer = _keyBuffer.Remove(0, 1);
 
-			if (KeyBuffer.Count == 5 &&
-				KeyBuffer[0] == Key.OemQuestion &&
-			    KeyBuffer[1] == Key.R &&
-			    KeyBuffer[2] == Key.A &&
-			    KeyBuffer[3] == Key.N &&
-			    KeyBuffer[4] == Key.T)
+			var c = e.Key.ToChar(KeyboardMonitor.IsKeyPressed(Key.SHIFT));
+			if (c == '\0')
+				return;
+
+			if (!_capturing)
 			{
-				DoRant(true);
+				if (c == '\b' && _keyBuffer.Length > 0)
+				{
+					_keyBuffer = _keyBuffer.Remove(_keyBuffer.Length - 1, 1);
+					return;
+				}
+
+				_keyBuffer += c;
+
+				switch (_keyBuffer.ToUpper())
+				{
+					case "/RANT":
+						DoRant(true);
+						break;
+					case "RANT(":
+						_capturing = true;
+						_captureString = string.Empty;
+						_captureObj = new LsItem("Rant(", new SolidColorBrush(Colors.Green));
+						ListBox.Items.Add(_captureObj);
+						break;
+				}
+			}
+			else
+			{
+				if (c == '\b')
+				{
+					_captureString = _captureString.Remove(_captureString.Length - 1, 1);
+					_captureObj.Text = _captureObj.Text.Remove(_captureObj.Text.Length - 1, 1);
+				}
+				else
+				{
+					_captureString += c;
+					_captureObj.Text += c;
+				}
+
+
+
+				if (!_captureString.ToUpper().EndsWith(");")) return;
+				_capturing = false;
+				_captureString = _captureString.Remove(_captureString.Length - 2, 2);
+
+				var output = _rantEngine.Do(_captureString);
+				PrintRant(output.ToString());
 			}
 		}
 
 		private void ListboxAdd(string newItem, SolidColorBrush color)
 		{
-			ListBox.Items.Add(new { Text = newItem, Color = color } );
+			ListBox.Items.Add(new LsItem(newItem, color));
 			ListBox.UpdateLayout();
 			ListBox.ScrollIntoView(ListBox.Items[ListBox.Items.Count - 1]);
 		}
 
-		private void Hook_KeyCombinationPressed(object sender, EventArgs e)
-		{
-			DoRant();
-		}
-		 
 		private void DoRant(bool backspace = false)
 		{
-// Get clipboard
+			// Get clipboard
 			if (!Clipboard.ContainsText(TextDataFormat.Text)) return;
 			var s = Clipboard.GetText(TextDataFormat.Text);
 
@@ -110,7 +152,7 @@ namespace RantType
 		{
 			if (rant.Contains("\n"))
 			{
-				var lines = rant.Split(new[] {Environment.NewLine}, StringSplitOptions.None);
+				var lines = rant.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
 
 				// ReSharper disable once ForCanBeConvertedToForeach
 				for (var index = 0; index < lines.Length; index++)
@@ -120,7 +162,7 @@ namespace RantType
 					{
 						SendKeys.SendWait(line);
 						SendKeys.SendWait(Environment.NewLine);
-						System.Threading.Thread.Sleep(50);
+						Thread.Sleep(50);
 					}
 					catch (Exception ex)
 					{
@@ -169,7 +211,8 @@ namespace RantType
 		{
 			if (_autoHide)
 				HideWindow();
-
+			//KeyboardMonitor.SyncObject = this;
+			KeyboardMonitor.Start();
 		}
 
 		private void SettingsMenuItem_Click(object sender, RoutedEventArgs e) => ShowWindow();
@@ -194,5 +237,37 @@ namespace RantType
 		}
 
 		#endregion
+	}
+
+	class LsItem : INotifyPropertyChanged
+	{
+		private string _text;
+		private SolidColorBrush _color;
+
+		public string Text
+		{
+			get { return _text; }
+			set { _text = value; PropChanged(); }
+		}
+
+		public SolidColorBrush Color
+		{
+			get { return _color; }
+			set { _color = value; PropChanged(); }
+		}
+
+		public LsItem(string tex, SolidColorBrush color)
+		{
+			Text = tex;
+			Color = color;
+		}
+
+		public event PropertyChangedEventHandler PropertyChanged;
+
+		[NotifyPropertyChangedInvocator]
+		protected virtual void PropChanged([CallerMemberName] string propertyName = null)
+		{
+			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+		}
 	}
 }
