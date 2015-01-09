@@ -11,7 +11,6 @@ using Rant;
 using RantType.Annotations;
 using Application = System.Windows.Application;
 using Clipboard = System.Windows.Clipboard;
-using Key = KeyStates.VirtualKeyCode;
 using KeyEventArgs = KeyStates.KeyEventArgs;
 using MessageBox = System.Windows.MessageBox;
 using TextDataFormat = System.Windows.TextDataFormat;
@@ -25,7 +24,7 @@ namespace RantType
 	{
 		// Don't like this feature, leaving it off.
 		private bool _allowClose = true;
-		private readonly bool _autoHide = false;
+		private readonly bool _autoHide;
 		private readonly RantEngine _rantEngine = new RantEngine("dictionaries");
 		readonly SolidColorBrush _redBrush = new SolidColorBrush(Colors.DarkRed);
 
@@ -47,7 +46,7 @@ namespace RantType
 			InitializeComponent();
 			var app = Application.Current as App;
 			if (app == null) return;
-			KeyboardMonitor.KeyPressed += Hook_KeyPressed;
+			PassiveKeyboardMonitor.KeyPressed += Hook_KeyPressed;
 		}
 
 		private void Hook_KeyPressed(KeyEventArgs e)
@@ -60,7 +59,7 @@ namespace RantType
 			if (_keyBuffer.Length == 5)
 				_keyBuffer = _keyBuffer.Remove(0, 1);
 
-			var c = e.Key.ToChar(KeyboardMonitor.IsKeyPressed(Key.SHIFT));
+			var c = e.Key.ToChar(PassiveKeyboardMonitor.IsShiftPressed, PassiveKeyboardMonitor.IsAltGrPressed);
 			if (c == '\0')
 				return;
 
@@ -211,8 +210,8 @@ namespace RantType
 		{
 			if (_autoHide)
 				HideWindow();
-			//KeyboardMonitor.SyncObject = this;
-			KeyboardMonitor.Start();
+			//PassiveKeyboardMonitor.SyncObject = this;
+			PassiveKeyboardMonitor.Start();
 		}
 
 		private void SettingsMenuItem_Click(object sender, RoutedEventArgs e) => ShowWindow();
